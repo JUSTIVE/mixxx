@@ -1,5 +1,7 @@
 #include "engine/controls/cuecontrol.h"
 
+#include <cmath>
+
 #include "control/controlindicator.h"
 #include "control/controlobject.h"
 #include "control/controlpushbutton.h"
@@ -186,6 +188,20 @@ void CueControl::createControls() {
     m_pOutroEndActivate = std::make_unique<ControlPushButton>(
             ConfigKey(m_group, "outro_end_activate"));
 
+    m_pMemoryCueSet = std::make_unique<ControlPushButton>(
+            ConfigKey(m_group, "memorycue_set"));
+    m_pMemoryCueSet->setButtonMode(ControlPushButton::TRIGGER);
+    m_pMemoryCueDelete = std::make_unique<ControlPushButton>(
+            ConfigKey(m_group, "memorycue_delete"));
+    m_pMemoryCueDelete->setButtonMode(ControlPushButton::TRIGGER);
+    m_pMemoryCueGotoPrev = std::make_unique<ControlPushButton>(
+            ConfigKey(m_group, "memorycue_goto_prev"));
+    m_pMemoryCueGotoNext = std::make_unique<ControlPushButton>(
+            ConfigKey(m_group, "memorycue_goto_next"));
+    m_pMemoryCueCount = std::make_unique<ControlObject>(
+            ConfigKey(m_group, "memorycue_count"));
+    m_pMemoryCueCount->setReadOnly();
+
     m_pVinylControlEnabled = std::make_unique<ControlProxy>(m_group, "vinylcontrol_enabled");
     m_pVinylControlMode = std::make_unique<ControlProxy>(m_group, "vinylcontrol_mode");
 
@@ -318,6 +334,27 @@ void CueControl::connectControls() {
             &CueControl::outroEndActivate,
             Qt::DirectConnection);
 
+    connect(m_pMemoryCueSet.get(),
+            &ControlObject::valueChanged,
+            this,
+            &CueControl::memoryCueSet,
+            Qt::DirectConnection);
+    connect(m_pMemoryCueDelete.get(),
+            &ControlObject::valueChanged,
+            this,
+            &CueControl::memoryCueDelete,
+            Qt::DirectConnection);
+    connect(m_pMemoryCueGotoPrev.get(),
+            &ControlObject::valueChanged,
+            this,
+            &CueControl::memoryCueGotoPrev,
+            Qt::DirectConnection);
+    connect(m_pMemoryCueGotoNext.get(),
+            &ControlObject::valueChanged,
+            this,
+            &CueControl::memoryCueGotoNext,
+            Qt::DirectConnection);
+
     connect(m_pHotcueFocusColorPrev.get(),
             &ControlObject::valueChanged,
             this,
@@ -413,6 +450,11 @@ void CueControl::disconnectControls() {
     disconnect(m_pOutroEndClear.get(), nullptr, this, nullptr);
     disconnect(m_pOutroEndActivate.get(), nullptr, this, nullptr);
 
+    disconnect(m_pMemoryCueSet.get(), nullptr, this, nullptr);
+    disconnect(m_pMemoryCueDelete.get(), nullptr, this, nullptr);
+    disconnect(m_pMemoryCueGotoPrev.get(), nullptr, this, nullptr);
+    disconnect(m_pMemoryCueGotoNext.get(), nullptr, this, nullptr);
+
     disconnect(m_pHotcueFocusColorPrev.get(), nullptr, this, nullptr);
     disconnect(m_pHotcueFocusColorNext.get(), nullptr, this, nullptr);
 
@@ -487,6 +529,7 @@ void CueControl::trackLoaded(TrackPointer pNewTrack) {
         m_pOutroEndPosition->set(Cue::kNoPosition);
         m_pOutroEndEnabled->forceSet(0.0);
         m_n60dBSoundStartPosition.setValue(Cue::kNoPosition);
+        m_pMemoryCueCount->forceSet(0);
         setHotcueFocusIndex(Cue::kNoHotCue);
         m_pLoadedTrack.reset();
         m_usedSeekOnLoadPosition.setValue(mixxx::audio::kStartFramePos);
@@ -621,6 +664,7 @@ void CueControl::loadCuesFromTrack() {
     CuePointer pMainCue;
     CuePointer pIntroCue;
     CuePointer pOutroCue;
+    int memoryCueCount = 0;
 
     const QList<CuePointer> cues = m_pLoadedTrack->getCuePoints();
     for (const auto& pCue : cues) {
@@ -674,6 +718,9 @@ void CueControl::loadCuesFromTrack() {
             m_n60dBSoundStartPosition.setValue(pos.startPosition.toEngineSamplePos());
             break;
         }
+        case mixxx::CueType::MemoryCue:
+            memoryCueCount++;
+            break;
         case mixxx::CueType::Beat:
         case mixxx::CueType::Jump:
         case mixxx::CueType::Invalid:
@@ -681,6 +728,8 @@ void CueControl::loadCuesFromTrack() {
             break;
         }
     }
+
+    m_pMemoryCueCount->forceSet(memoryCueCount);
 
     // Detach all hotcues that are no longer present
     for (int hotCueIndex = 0; hotCueIndex < m_iNumHotCues; ++hotCueIndex) {
@@ -2008,6 +2057,154 @@ void CueControl::outroEndActivate(double value) {
         seekAbs(outroEnd);
     } else {
         outroEndSet(1.0);
+    }
+}
+
+void CueControl::memoryCueSet(double value) {
+    if (value <= 0) {
+        return;
+    }
+
+    auto lock = lockMutex(&m_trackMutex);
+    const mixxx::audio::FramePos position = getQuantizedCurrentPosition();
+    TrackPointer pLoadedTrack = m_pLoadedTrack;
+    lock.unlock();
+
+    if (!pLoadedTrack || !position.isValid()) {
+        return;
+    }
+
+    // Refuse to stack a second memory cue on (almost) the same position.
+    // CDJs snap repeated MEMORY presses at the same spot to a single cue.
+    const mixxx::audio::FrameDiff_t toleranceFrames =
+            frameInfo().sampleRate.isValid() ? frameInfo().sampleRate * 0.05 : 0;
+    const QList<CuePointer> cues = pLoadedTrack->getCuePoints();
+    for (const auto& pCue : cues) {
+        if (pCue->getType() != mixxx::CueType::MemoryCue) {
+            continue;
+        }
+        const auto cuePosition = pCue->getPosition();
+        if (cuePosition.isValid() &&
+                std::abs(cuePosition - position) <= toleranceFrames) {
+            return;
+        }
+    }
+
+    // CO updates (memorycue_count) happen via loadCuesFromTrack() when the
+    // track emits cuesUpdated.
+    pLoadedTrack->createAndAddCue(
+            mixxx::CueType::MemoryCue,
+            Cue::kNoHotCue,
+            position,
+            mixxx::audio::kInvalidFramePos);
+}
+
+void CueControl::memoryCueDelete(double value) {
+    if (value <= 0) {
+        return;
+    }
+
+    auto lock = lockMutex(&m_trackMutex);
+    const mixxx::audio::FramePos position = frameInfo().currentPosition;
+    TrackPointer pLoadedTrack = m_pLoadedTrack;
+    lock.unlock();
+
+    if (!pLoadedTrack || !position.isValid()) {
+        return;
+    }
+
+    // Delete the memory cue closest to the playhead, but only if it is within
+    // grabbing distance -- deleting a cue that is nowhere near what the user
+    // is looking at would be data loss, not cleanup.
+    const mixxx::audio::FrameDiff_t toleranceFrames =
+            frameInfo().sampleRate.isValid() ? frameInfo().sampleRate * 0.5 : 0;
+    CuePointer pNearestCue;
+    mixxx::audio::FrameDiff_t nearestDistance = 0;
+    const QList<CuePointer> cues = pLoadedTrack->getCuePoints();
+    for (const auto& pCue : cues) {
+        if (pCue->getType() != mixxx::CueType::MemoryCue) {
+            continue;
+        }
+        const auto cuePosition = pCue->getPosition();
+        if (!cuePosition.isValid()) {
+            continue;
+        }
+        const mixxx::audio::FrameDiff_t distance = std::abs(cuePosition - position);
+        if (distance <= toleranceFrames &&
+                (!pNearestCue || distance < nearestDistance)) {
+            pNearestCue = pCue;
+            nearestDistance = distance;
+        }
+    }
+
+    if (pNearestCue) {
+        pLoadedTrack->removeCue(pNearestCue);
+    }
+}
+
+void CueControl::memoryCueGotoPrev(double value) {
+    if (value <= 0) {
+        return;
+    }
+
+    auto lock = lockMutex(&m_trackMutex);
+    const mixxx::audio::FramePos position = frameInfo().currentPosition;
+    TrackPointer pLoadedTrack = m_pLoadedTrack;
+    lock.unlock();
+
+    if (!pLoadedTrack || !position.isValid()) {
+        return;
+    }
+
+    // Strictly before the playhead: when parked exactly on a memory cue,
+    // "prev" moves to the one before it (CDJ CUE/LOOP CALL behavior).
+    mixxx::audio::FramePos best = mixxx::audio::kInvalidFramePos;
+    const QList<CuePointer> cues = pLoadedTrack->getCuePoints();
+    for (const auto& pCue : cues) {
+        if (pCue->getType() != mixxx::CueType::MemoryCue) {
+            continue;
+        }
+        const auto cuePosition = pCue->getPosition();
+        if (cuePosition.isValid() && cuePosition < position &&
+                (!best.isValid() || cuePosition > best)) {
+            best = cuePosition;
+        }
+    }
+
+    if (best.isValid()) {
+        seekAbs(best);
+    }
+}
+
+void CueControl::memoryCueGotoNext(double value) {
+    if (value <= 0) {
+        return;
+    }
+
+    auto lock = lockMutex(&m_trackMutex);
+    const mixxx::audio::FramePos position = frameInfo().currentPosition;
+    TrackPointer pLoadedTrack = m_pLoadedTrack;
+    lock.unlock();
+
+    if (!pLoadedTrack || !position.isValid()) {
+        return;
+    }
+
+    mixxx::audio::FramePos best = mixxx::audio::kInvalidFramePos;
+    const QList<CuePointer> cues = pLoadedTrack->getCuePoints();
+    for (const auto& pCue : cues) {
+        if (pCue->getType() != mixxx::CueType::MemoryCue) {
+            continue;
+        }
+        const auto cuePosition = pCue->getPosition();
+        if (cuePosition.isValid() && cuePosition > position &&
+                (!best.isValid() || cuePosition < best)) {
+            best = cuePosition;
+        }
+    }
+
+    if (best.isValid()) {
+        seekAbs(best);
     }
 }
 

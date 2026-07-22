@@ -266,6 +266,11 @@ class CueControl : public EngineControl {
     void outroEndClear(double v);
     void outroEndActivate(double v);
 
+    void memoryCueSet(double v);
+    void memoryCueDelete(double v);
+    void memoryCueGotoPrev(double v);
+    void memoryCueGotoNext(double v);
+
   private:
     enum class TrackAt {
         Cue,
@@ -348,6 +353,14 @@ class CueControl : public EngineControl {
     std::unique_ptr<ControlPushButton> m_pOutroEndSet;
     std::unique_ptr<ControlPushButton> m_pOutroEndClear;
     std::unique_ptr<ControlPushButton> m_pOutroEndActivate;
+
+    // Memory cues (CDJ-style): position-only cues navigated sequentially,
+    // not bound to hotcue slots. See CueType::MemoryCue.
+    std::unique_ptr<ControlPushButton> m_pMemoryCueSet;
+    std::unique_ptr<ControlPushButton> m_pMemoryCueDelete;
+    std::unique_ptr<ControlPushButton> m_pMemoryCueGotoPrev;
+    std::unique_ptr<ControlPushButton> m_pMemoryCueGotoNext;
+    std::unique_ptr<ControlObject> m_pMemoryCueCount;
 
     ControlValueAtomic<double> m_n60dBSoundStartPosition;
 
