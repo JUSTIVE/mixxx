@@ -6,6 +6,7 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPen>
+#include <QPolygonF>
 #include <QVBoxLayout>
 
 #include "analyzer/analyzerprogress.h"
@@ -680,6 +681,7 @@ void WOverview::paintEvent(QPaintEvent* pEvent) {
                     static_cast<CSAMPLE_GAIN>(trackSamples);
 
             drawRangeMarks(&painter, offset, gain);
+            drawMemoryCues(&painter, offset, gain);
             drawMarks(&painter, offset, gain);
             drawPickupPosition(&painter);
             drawTimeRuler(&painter);
@@ -875,6 +877,60 @@ void WOverview::drawRangeMarks(QPainter* pPainter, const float& offset, const fl
             pPainter->drawRect(QRectF(QPointF(-2.0, startPosition),
                     QPointF(width() + 1.0, endPosition)));
         }
+    }
+}
+
+void WOverview::drawMemoryCues(QPainter* pPainter, const float offset, const float gain) {
+    // Memory cues are not part of the skin-defined WaveformMarkSet (which
+    // assumes a fixed set of controls, one per hotcue slot), so they are
+    // painted directly from the track's cue list: a thin line with a small
+    // CDJ-style triangle at the top edge. Repaints arrive via the existing
+    // Track::cuesUpdated -> receiveCuesUpdated connection.
+    if (!m_pCurrentTrack) {
+        return;
+    }
+
+    const float triangleWidth = 8.0f * m_scaleFactor;
+    const float triangleHeight = 6.0f * m_scaleFactor;
+
+    const QList<CuePointer> cues = m_pCurrentTrack->getCuePoints();
+    for (const CuePointer& pCue : cues) {
+        if (pCue->getType() != mixxx::CueType::MemoryCue) {
+            continue;
+        }
+        const mixxx::audio::FramePos position = pCue->getPosition();
+        if (!position.isValid()) {
+            continue;
+        }
+
+        const float markPosition = math_clamp(
+                offset + static_cast<float>(position.toEngineSamplePos()) * gain,
+                0.0f,
+                static_cast<float>(width()));
+
+        const QColor color = mixxx::RgbColor::toQColor(pCue->getColor());
+
+        PainterScope painterScope(pPainter);
+        pPainter->setPen(QPen(color, 1.0 * m_scaleFactor));
+        if (m_orientation == Qt::Horizontal) {
+            pPainter->drawLine(QLineF(markPosition, 0.0, markPosition, height()));
+        } else {
+            pPainter->drawLine(QLineF(0.0, markPosition, width(), markPosition));
+        }
+
+        QPolygonF triangle;
+        if (m_orientation == Qt::Horizontal) {
+            triangle << QPointF(markPosition - triangleWidth / 2, 0.0)
+                     << QPointF(markPosition + triangleWidth / 2, 0.0)
+                     << QPointF(markPosition, triangleHeight);
+        } else {
+            triangle << QPointF(0.0, markPosition - triangleWidth / 2)
+                     << QPointF(0.0, markPosition + triangleWidth / 2)
+                     << QPointF(triangleHeight, markPosition);
+        }
+        pPainter->setPen(Qt::NoPen);
+        pPainter->setBrush(color);
+        pPainter->drawPolygon(triangle);
     }
 }
 
