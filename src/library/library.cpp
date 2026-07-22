@@ -14,7 +14,6 @@
 #include "library/export/libraryexporter.h"
 #endif
 #include "library/externaltrackcollection.h"
-#include "library/itunes/itunesfeature.h"
 #include "library/library_prefs.h"
 #include "library/librarycontrol.h"
 #include "library/libraryfeature.h"
@@ -182,11 +181,11 @@ Library::Library(
             addFeature(new BansheeFeature(this, m_pConfig));
         }
     }
-    if (ITunesFeature::isSupported() &&
-            m_pConfig->getValue(
-                    ConfigKey(kConfigGroup, "ShowITunesLibrary"), true)) {
-        addFeature(new ITunesFeature(this, m_pConfig));
-    }
+    // iTunes / Apple Music is deliberately not registered in this build. The
+    // target is a headless Raspberry Pi DJ appliance with no Apple Music
+    // library, so the sidebar entry is only clutter on a small screen.
+    // Removed rather than defaulted off because the config file is not seeded
+    // on the image (see mixxx-pi-gen stage3/02-desktop/03-run.sh).
     if (TraktorFeature::isSupported() &&
             m_pConfig->getValue(
                     ConfigKey(kConfigGroup, "ShowTraktorLibrary"), true)) {
