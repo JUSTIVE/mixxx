@@ -204,8 +204,6 @@ PioneerDDJFLX4.beatjumpSizeForPad = {
     0x27: 8   // PAD 8
 };
 
-PioneerDDJFLX4.quickJumpSize = 32;
-
 // Used for tempo slider
 PioneerDDJFLX4.highResMSB = {
     "[Channel1]": {},
@@ -499,15 +497,19 @@ PioneerDDJFLX4.loopToggle = function(value, group, control) {
 // CUE/LOOP CALL
 //
 
-PioneerDDJFLX4.cueLoopCallLeft = function(_channel, _control, value, _status, group) {
+// CUE/LOOP CALL navigates Rekordbox-style memory cues (CueType::MemoryCue),
+// matching what these buttons do on a CDJ. This replaces the upstream
+// loop halve/double behavior; loop size is still reachable via the
+// 4BEAT/EXIT and RELOOP/EXIT buttons.
+PioneerDDJFLX4.memoryCueCallLeft = function(_channel, _control, value, _status, group) {
     if (value) {
-        engine.setValue(group, "loop_scale", 0.5);
+        engine.setValue(group, "memorycue_goto_prev", 1);
     }
 };
 
-PioneerDDJFLX4.cueLoopCallRight = function(_channel, _control, value, _status, group) {
+PioneerDDJFLX4.memoryCueCallRight = function(_channel, _control, value, _status, group) {
     if (value) {
-        engine.setValue(group, "loop_scale", 2.0);
+        engine.setValue(group, "memorycue_goto_next", 1);
     }
 };
 
@@ -778,15 +780,19 @@ PioneerDDJFLX4.toggleQuantize = function(_channel, _control, value, _status, gro
     }
 };
 
-PioneerDDJFLX4.quickJumpForward = function(_channel, _control, value, _status, group) {
+// SHIFT + CUE/LOOP CALL edits memory cues, mirroring CDJ MEMORY/DELETE:
+// SHIFT + right adds a memory cue at the playhead, SHIFT + left deletes
+// the one nearest to the playhead (within 500 ms). This replaces the
+// upstream quick beatjump behavior.
+PioneerDDJFLX4.memoryCueSet = function(_channel, _control, value, _status, group) {
     if (value) {
-        engine.setValue(group, "beatjump", PioneerDDJFLX4.quickJumpSize);
+        engine.setValue(group, "memorycue_set", 1);
     }
 };
 
-PioneerDDJFLX4.quickJumpBack = function(_channel, _control, value, _status, group) {
+PioneerDDJFLX4.memoryCueDelete = function(_channel, _control, value, _status, group) {
     if (value) {
-        engine.setValue(group, "beatjump", -PioneerDDJFLX4.quickJumpSize);
+        engine.setValue(group, "memorycue_delete", 1);
     }
 };
 
