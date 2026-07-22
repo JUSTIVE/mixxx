@@ -141,6 +141,40 @@ void allshader::WaveformRenderMark::drawTexture(
     m_textureShader.release();
 }
 
+void allshader::WaveformRenderMark::drawMemoryCues(const QMatrix4x4& matrix) {
+    // Memory cues (CueType::MemoryCue) are not part of the skin-defined
+    // WaveformMarkSet, which assumes one mark per fixed control name.
+    // Draw them directly from the track's cue list as thin vertical
+    // lines in the cue's color, matching how CDJs show memory cues on
+    // the scrolling waveform.
+    const TrackPointer pTrack = m_waveformRenderer->getTrackInfo();
+    if (!pTrack) {
+        return;
+    }
+
+    const float breadth = m_waveformRenderer->getBreadth();
+    const float length = static_cast<float>(m_waveformRenderer->getLength());
+    const QList<CuePointer> cues = pTrack->getCuePoints();
+    for (const CuePointer& pCue : cues) {
+        if (pCue->getType() != mixxx::CueType::MemoryCue) {
+            continue;
+        }
+        const mixxx::audio::FramePos position = pCue->getPosition();
+        if (!position.isValid()) {
+            continue;
+        }
+        const float x = static_cast<float>(
+                m_waveformRenderer->transformSamplePositionInRendererWorld(
+                        position.toEngineSamplePos()));
+        if (x < 0.f || x > length) {
+            continue;
+        }
+        QColor color = mixxx::RgbColor::toQColor(pCue->getColor());
+        color.setAlphaF(0.9f);
+        drawMark(matrix, QRectF(x - 0.75, 0.0, 1.5, breadth), color);
+    }
+}
+
 void allshader::WaveformRenderMark::drawMark(
         const QMatrix4x4& matrix, const QRectF& rect, QColor color) {
     // draw a gradient towards transparency at the upper and lower 25% of the waveform view
@@ -301,6 +335,10 @@ void allshader::WaveformRenderMark::paintGL() {
         }
     }
     m_waveformRenderer->setMarkPositions(marksOnScreen);
+
+    if (!m_isSlipRenderer) {
+        drawMemoryCues(matrix);
+    }
 
     const float currentMarkPoint =
             std::round(static_cast<float>(

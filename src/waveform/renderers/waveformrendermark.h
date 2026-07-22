@@ -10,6 +10,7 @@ class WaveformRenderMark : public WaveformRenderMarkBase {
 
   private:
     void updateMarkImage(WaveformMarkPointer pMark) override;
+    void drawMemoryCues(QPainter* painter);
 
     DISALLOW_COPY_AND_ASSIGN(WaveformRenderMark);
 };

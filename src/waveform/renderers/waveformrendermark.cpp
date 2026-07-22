@@ -1,5 +1,9 @@
 #include "waveform/renderers/waveformrendermark.h"
 
+#include <QLineF>
+#include <QPen>
+
+#include "track/track.h"
 #include "util/painterscope.h"
 #include "waveform/renderers/waveformwidgetrenderer.h"
 
@@ -21,12 +25,64 @@ WaveformRenderMark::WaveformRenderMark(
         : WaveformRenderMarkBase(waveformWidgetRenderer, true) {
 }
 
+void WaveformRenderMark::drawMemoryCues(QPainter* painter) {
+    // Memory cues (CueType::MemoryCue) are not part of the skin-defined
+    // WaveformMarkSet, which assumes one mark per fixed control name.
+    // Draw them directly from the track's cue list as thin lines in the
+    // cue's color, matching how CDJs show memory cues on the scrolling
+    // waveform.
+    const TrackPointer pTrack = m_waveformRenderer->getTrackInfo();
+    if (!pTrack) {
+        return;
+    }
+
+    PainterScope painterScope(painter);
+    const QList<CuePointer> cues = pTrack->getCuePoints();
+    for (const CuePointer& pCue : cues) {
+        if (pCue->getType() != mixxx::CueType::MemoryCue) {
+            continue;
+        }
+        const mixxx::audio::FramePos position = pCue->getPosition();
+        if (!position.isValid()) {
+            continue;
+        }
+        const double markPoint =
+                m_waveformRenderer->transformSamplePositionInRendererWorld(
+                        position.toEngineSamplePos());
+
+        QColor color = mixxx::RgbColor::toQColor(pCue->getColor());
+        color.setAlphaF(0.9f);
+        painter->setPen(QPen(color, 1.5));
+
+        if (m_waveformRenderer->getOrientation() == Qt::Horizontal) {
+            if (markPoint < 0 || markPoint > m_waveformRenderer->getWidth()) {
+                continue;
+            }
+            painter->drawLine(QLineF(markPoint,
+                    0.0,
+                    markPoint,
+                    m_waveformRenderer->getHeight()));
+        } else {
+            if (markPoint < 0 || markPoint > m_waveformRenderer->getHeight()) {
+                continue;
+            }
+            painter->drawLine(QLineF(0.0,
+                    markPoint,
+                    m_waveformRenderer->getWidth(),
+                    markPoint));
+        }
+    }
+}
+
 void WaveformRenderMark::draw(QPainter* painter, QPaintEvent* /*event*/) {
     PainterScope PainterScope(painter);
     // Associates mark objects with their positions in the widget.
     QList<WaveformWidgetRenderer::WaveformMarkOnScreen> marksOnScreen;
 
     painter->setWorldMatrixEnabled(false);
+
+    // Below the skin-defined marks so hotcue markers stay on top.
+    drawMemoryCues(painter);
 
     for (const auto& pMark : std::as_const(m_marks)) {
         const QImage& image = static_cast<ImageGraphics*>(pMark->m_pGraphics.get())->image();
