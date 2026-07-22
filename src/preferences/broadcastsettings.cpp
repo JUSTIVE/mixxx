@@ -1,6 +1,7 @@
 #include "preferences/broadcastsettings.h"
 
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QStringList>
 
@@ -51,6 +52,18 @@ void BroadcastSettings::loadProfiles() {
 
         // Load profiles from filesystem
         for (const QFileInfo& fileInfo : files) {
+            if (fileInfo.size() == 0) {
+                // Left behind by an interrupted save from before saving became
+                // atomic. Parsing it would only raise an error dialog on every
+                // start; drop it and let the default profile be recreated
+                // below.
+                kLogger.warning()
+                        << "Discarding empty broadcast profile"
+                        << fileInfo.absoluteFilePath();
+                QFile::remove(fileInfo.absoluteFilePath());
+                continue;
+            }
+
             BroadcastProfilePtr profile =
                     BroadcastProfile::loadFromFile(fileInfo.absoluteFilePath());
 
@@ -58,8 +71,12 @@ void BroadcastSettings::loadProfiles() {
                 addProfile(profile);
             }
         }
-    } else {
-        kLogger.info() << "No profiles found. Creating default profile.";
+    }
+
+    // Not an else branch: files may have existed but all been unusable, in
+    // which case we still need a profile to hand out.
+    if (m_profiles.isEmpty()) {
+        kLogger.info() << "No usable profiles found. Creating default profile.";
 
         BroadcastProfilePtr defaultProfile(
                     new BroadcastProfile(kDefaultProfile));

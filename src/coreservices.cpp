@@ -1,6 +1,7 @@
 #include "coreservices.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QFileDialog>
 #include <QProcess>
 #include <QProcessEnvironment>
@@ -587,20 +588,38 @@ void CoreServices::initialize(QApplication* pApp) {
     bool musicDirAdded = false;
 
     if (m_pTrackCollectionManager->internalCollection()->loadRootDirs().isEmpty()) {
-        // TODO(XXX) this needs to be smarter, we can't distinguish between an empty
-        // path return value (not sure if this is normally possible, but it is
-        // possible with the Windows 7 "Music" library, which is what
-        // QStandardPaths::writableLocation(QStandardPaths::MusicLocation)
-        // resolves to) and a user hitting 'cancel'. If we get a blank return
-        // but the user didn't hit cancel, we need to know this and let the
-        // user take some course of action -- bkgood
-        QString fd = QFileDialog::getExistingDirectory(nullptr,
-                tr("Choose music library directory"),
-                QStandardPaths::writableLocation(
-                        QStandardPaths::MusicLocation));
-        // request to add directory to database.
-        if (!fd.isEmpty() && m_pLibrary->requestAddDir(fd)) {
+        // An appliance build boots straight into Mixxx with no keyboard or
+        // mouse attached, where a modal directory picker is unanswerable and
+        // looks like a hang. If [Library] DefaultMusicDirectory names an
+        // existing directory, adopt it instead of asking. Absent the setting
+        // the behavior is unchanged.
+        const QString defaultMusicDir = pConfig->getValueString(
+                ConfigKey("[Library]", "DefaultMusicDirectory"));
+        if (!defaultMusicDir.isEmpty() && QDir(defaultMusicDir).exists() &&
+                m_pLibrary->requestAddDir(defaultMusicDir)) {
+            qDebug() << "Adopted configured music directory" << defaultMusicDir;
             musicDirAdded = true;
+        } else {
+            if (!defaultMusicDir.isEmpty()) {
+                qWarning() << "Configured music directory unusable, falling "
+                              "back to the directory picker:"
+                           << defaultMusicDir;
+            }
+            // TODO(XXX) this needs to be smarter, we can't distinguish between an empty
+            // path return value (not sure if this is normally possible, but it is
+            // possible with the Windows 7 "Music" library, which is what
+            // QStandardPaths::writableLocation(QStandardPaths::MusicLocation)
+            // resolves to) and a user hitting 'cancel'. If we get a blank return
+            // but the user didn't hit cancel, we need to know this and let the
+            // user take some course of action -- bkgood
+            QString fd = QFileDialog::getExistingDirectory(nullptr,
+                    tr("Choose music library directory"),
+                    QStandardPaths::writableLocation(
+                            QStandardPaths::MusicLocation));
+            // request to add directory to database.
+            if (!fd.isEmpty() && m_pLibrary->requestAddDir(fd)) {
+                musicDirAdded = true;
+            }
         }
     }
 

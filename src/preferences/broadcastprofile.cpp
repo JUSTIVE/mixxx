@@ -2,6 +2,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QString>
 #include <QStringList>
 #include <QTextStream>
@@ -480,14 +481,20 @@ bool BroadcastProfile::save(const QString& filename) {
 
     doc.appendChild(docRoot);
 
-    QFile xmlFile(filename);
+    // Write through a temporary file and rename over the target. Opening the
+    // real file WriteOnly truncates it to zero immediately, so losing power
+    // (or being killed) between the truncate and the flush left a zero-byte
+    // profile behind -- which then failed to parse on every later start.
+    QSaveFile xmlFile(filename);
     if (xmlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        m_filename = filename;
         QTextStream fileStream(&xmlFile);
         doc.save(fileStream, 4);
-        xmlFile.close();
-
-        return true;
+        fileStream.flush();
+        if (xmlFile.commit()) {
+            m_filename = filename;
+            return true;
+        }
+        qWarning() << "BroadcastProfile::save: failed to commit" << filename;
     }
     return false;
 }
