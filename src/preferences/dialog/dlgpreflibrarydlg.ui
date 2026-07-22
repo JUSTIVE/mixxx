@@ -457,16 +457,6 @@
         </property>
        </widget>
       </item>
-      <item row="2" column="0">
-       <widget class="QCheckBox" name="checkBox_show_itunes">
-        <property name="text">
-         <string>Show iTunes Library</string>
-        </property>
-        <property name="checked">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
       <item row="3" column="0">
        <widget class="QCheckBox" name="checkBox_show_traktor">
         <property name="text">
@@ -691,7 +681,6 @@
   <tabstop>spinbox_history_min_tracks_to_keep</tabstop>
   <tabstop>checkBox_show_rhythmbox</tabstop>
   <tabstop>checkBox_show_banshee</tabstop>
-  <tabstop>checkBox_show_itunes</tabstop>
   <tabstop>checkBox_show_traktor</tabstop>
   <tabstop>checkBox_show_rekordbox</tabstop>
   <tabstop>checkBox_show_serato</tabstop>

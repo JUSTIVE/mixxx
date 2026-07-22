@@ -264,7 +264,6 @@ void DlgPrefLibrary::slotResetToDefaults() {
 
     checkBox_show_rhythmbox->setChecked(true);
     checkBox_show_banshee->setChecked(true);
-    checkBox_show_itunes->setChecked(true);
     checkBox_show_traktor->setChecked(true);
     checkBox_show_rekordbox->setChecked(true);
 }
@@ -293,8 +292,6 @@ void DlgPrefLibrary::slotUpdate() {
             ConfigKey("[Library]","ShowRhythmboxLibrary"), true));
     checkBox_show_banshee->setChecked(m_pConfig->getValue(
             ConfigKey("[Library]","ShowBansheeLibrary"), true));
-    checkBox_show_itunes->setChecked(m_pConfig->getValue(
-            ConfigKey("[Library]","ShowITunesLibrary"), true));
     checkBox_show_traktor->setChecked(m_pConfig->getValue(
             ConfigKey("[Library]","ShowTraktorLibrary"), true));
     checkBox_show_rekordbox->setChecked(m_pConfig->getValue(
@@ -535,8 +532,6 @@ void DlgPrefLibrary::slotApply() {
                 ConfigValue((int)checkBox_show_rhythmbox->isChecked()));
     m_pConfig->set(ConfigKey("[Library]","ShowBansheeLibrary"),
                 ConfigValue((int)checkBox_show_banshee->isChecked()));
-    m_pConfig->set(ConfigKey("[Library]","ShowITunesLibrary"),
-                ConfigValue((int)checkBox_show_itunes->isChecked()));
     m_pConfig->set(ConfigKey("[Library]","ShowTraktorLibrary"),
                 ConfigValue((int)checkBox_show_traktor->isChecked()));
     m_pConfig->set(ConfigKey("[Library]","ShowRekordboxLibrary"),

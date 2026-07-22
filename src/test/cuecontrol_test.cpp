@@ -584,3 +584,129 @@ TEST_F(CueControlTest, OutroCue_SetStartEnd_ClearStartEnd) {
 
     EXPECT_EQ(nullptr, pTrack->findCueByType(mixxx::CueType::Outro));
 }
+
+namespace {
+int countMemoryCues(const TrackPointer& pTrack) {
+    int count = 0;
+    const QList<CuePointer> cues = pTrack->getCuePoints();
+    for (const auto& pCue : cues) {
+        if (pCue->getType() == mixxx::CueType::MemoryCue) {
+            count++;
+        }
+    }
+    return count;
+}
+} // namespace
+
+TEST_F(CueControlTest, MemoryCueSetCountAndDedup) {
+    TrackPointer pTrack = createTestTrack();
+    loadTrack(pTrack);
+
+    auto memorySet = std::make_unique<ControlProxy>(m_sGroup1, "memorycue_set");
+    auto memoryCount = std::make_unique<ControlProxy>(m_sGroup1, "memorycue_count");
+
+    m_pQuantizeEnabled->set(0.0);
+    EXPECT_DOUBLE_EQ(0.0, memoryCount->get());
+
+    setCurrentFramePos(mixxx::audio::FramePos(10000));
+    memorySet->set(1.0);
+    EXPECT_EQ(1, countMemoryCues(pTrack));
+    EXPECT_DOUBLE_EQ(1.0, memoryCount->get());
+
+    // Pressing again at (almost) the same spot must not stack a duplicate;
+    // the dedup tolerance is 50 ms (2205 frames at 44.1 kHz).
+    memorySet->set(0.0);
+    memorySet->set(1.0);
+    EXPECT_EQ(1, countMemoryCues(pTrack));
+
+    // Beyond the tolerance a second cue is created.
+    setCurrentFramePos(mixxx::audio::FramePos(20000));
+    memorySet->set(0.0);
+    memorySet->set(1.0);
+    EXPECT_EQ(2, countMemoryCues(pTrack));
+    EXPECT_DOUBLE_EQ(2.0, memoryCount->get());
+
+    // Count resets on unload.
+    unloadTrack();
+    ProcessBuffer();
+    EXPECT_DOUBLE_EQ(0.0, memoryCount->get());
+}
+
+TEST_F(CueControlTest, MemoryCueNavigation) {
+    TrackPointer pTrack = createTestTrack();
+    pTrack->createAndAddCue(mixxx::CueType::MemoryCue,
+            Cue::kNoHotCue,
+            mixxx::audio::FramePos(10000),
+            mixxx::audio::kInvalidFramePos);
+    pTrack->createAndAddCue(mixxx::CueType::MemoryCue,
+            Cue::kNoHotCue,
+            mixxx::audio::FramePos(20000),
+            mixxx::audio::kInvalidFramePos);
+    pTrack->createAndAddCue(mixxx::CueType::MemoryCue,
+            Cue::kNoHotCue,
+            mixxx::audio::FramePos(30000),
+            mixxx::audio::kInvalidFramePos);
+    loadTrack(pTrack);
+
+    auto gotoPrev = std::make_unique<ControlProxy>(m_sGroup1, "memorycue_goto_prev");
+    auto gotoNext = std::make_unique<ControlProxy>(m_sGroup1, "memorycue_goto_next");
+
+    setCurrentFramePos(mixxx::audio::FramePos(15000));
+
+    gotoNext->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos(20000), getCurrentFramePos());
+
+    // Parked exactly on a memory cue, "prev" moves to the one before it
+    // (CDJ CUE/LOOP CALL behavior), not back to the same cue.
+    gotoPrev->set(0.0);
+    gotoPrev->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos(10000), getCurrentFramePos());
+
+    // No memory cue before the first one: stay put.
+    gotoPrev->set(0.0);
+    gotoPrev->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos(10000), getCurrentFramePos());
+
+    // Next twice from the first cue reaches the last one; a further next
+    // stays put.
+    gotoNext->set(0.0);
+    gotoNext->set(1.0);
+    ProcessBuffer();
+    gotoNext->set(0.0);
+    gotoNext->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos(30000), getCurrentFramePos());
+    gotoNext->set(0.0);
+    gotoNext->set(1.0);
+    ProcessBuffer();
+    EXPECT_FRAMEPOS_EQ(mixxx::audio::FramePos(30000), getCurrentFramePos());
+}
+
+TEST_F(CueControlTest, MemoryCueDeleteWithinTolerance) {
+    TrackPointer pTrack = createTestTrack();
+    pTrack->createAndAddCue(mixxx::CueType::MemoryCue,
+            Cue::kNoHotCue,
+            mixxx::audio::FramePos(100000),
+            mixxx::audio::kInvalidFramePos);
+    loadTrack(pTrack);
+
+    auto memoryDelete = std::make_unique<ControlProxy>(m_sGroup1, "memorycue_delete");
+    auto memoryCount = std::make_unique<ControlProxy>(m_sGroup1, "memorycue_count");
+    EXPECT_DOUBLE_EQ(1.0, memoryCount->get());
+
+    // Far away (more than 500 ms = 22050 frames at 44.1 kHz): refuse to
+    // delete, that would be data loss rather than cleanup.
+    setCurrentFramePos(mixxx::audio::FramePos(160000));
+    memoryDelete->set(1.0);
+    EXPECT_EQ(1, countMemoryCues(pTrack));
+
+    // Within tolerance: delete.
+    setCurrentFramePos(mixxx::audio::FramePos(110000));
+    memoryDelete->set(0.0);
+    memoryDelete->set(1.0);
+    EXPECT_EQ(0, countMemoryCues(pTrack));
+    EXPECT_DOUBLE_EQ(0.0, memoryCount->get());
+}

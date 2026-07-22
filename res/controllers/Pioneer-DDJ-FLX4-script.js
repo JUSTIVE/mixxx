@@ -25,7 +25,8 @@
 //                ON/OFF toggles focused effect slot
 //                SHIFT + ON/OFF disables all three effect slots.
 //
-//      * 32 beat jump forward & back (Shift + </> CUE/LOOP CALL arrows)
+//      * Memory cue navigation (</> CUE/LOOP CALL arrows), CDJ-style
+//      * Memory cue delete/set (Shift + </> CUE/LOOP CALL arrows)
 //      * Toggle quantize (Shift + channel cue)
 //
 //  Not implemented (after discussion and trial attempts):
@@ -33,7 +34,6 @@
 //        * -4BEAT auto loop (hacky---prefer a clean way to set a 4 beat loop
 //                            from a previous position on long press)
 //
-//        * CUE/LOOP CALL - memory & delete (complex and not useful. Hot cues are sufficient)
 //
 //      * Secondary pad modes (trial attempts complex and too experimental)
 //        * Keyboard mode
@@ -502,15 +502,13 @@ PioneerDDJFLX4.loopToggle = function(value, group, control) {
 // loop halve/double behavior; loop size is still reachable via the
 // 4BEAT/EXIT and RELOOP/EXIT buttons.
 PioneerDDJFLX4.memoryCueCallLeft = function(_channel, _control, value, _status, group) {
-    if (value) {
-        engine.setValue(group, "memorycue_goto_prev", 1);
-    }
+    // Forward both edges: COs ignore same-value sets (bIgnoreNops), so the
+    // release must reset the control to 0 or the next press would be a no-op.
+    engine.setValue(group, "memorycue_goto_prev", value ? 1 : 0);
 };
 
 PioneerDDJFLX4.memoryCueCallRight = function(_channel, _control, value, _status, group) {
-    if (value) {
-        engine.setValue(group, "memorycue_goto_next", 1);
-    }
+    engine.setValue(group, "memorycue_goto_next", value ? 1 : 0);
 };
 
 //
@@ -785,15 +783,11 @@ PioneerDDJFLX4.toggleQuantize = function(_channel, _control, value, _status, gro
 // the one nearest to the playhead (within 500 ms). This replaces the
 // upstream quick beatjump behavior.
 PioneerDDJFLX4.memoryCueSet = function(_channel, _control, value, _status, group) {
-    if (value) {
-        engine.setValue(group, "memorycue_set", 1);
-    }
+    engine.setValue(group, "memorycue_set", value ? 1 : 0);
 };
 
 PioneerDDJFLX4.memoryCueDelete = function(_channel, _control, value, _status, group) {
-    if (value) {
-        engine.setValue(group, "memorycue_delete", 1);
-    }
+    engine.setValue(group, "memorycue_delete", value ? 1 : 0);
 };
 
 //

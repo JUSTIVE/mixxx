@@ -196,8 +196,10 @@ void CueControl::createControls() {
     m_pMemoryCueDelete->setButtonMode(ControlPushButton::TRIGGER);
     m_pMemoryCueGotoPrev = std::make_unique<ControlPushButton>(
             ConfigKey(m_group, "memorycue_goto_prev"));
+    m_pMemoryCueGotoPrev->setButtonMode(ControlPushButton::TRIGGER);
     m_pMemoryCueGotoNext = std::make_unique<ControlPushButton>(
             ConfigKey(m_group, "memorycue_goto_next"));
+    m_pMemoryCueGotoNext->setButtonMode(ControlPushButton::TRIGGER);
     m_pMemoryCueCount = std::make_unique<ControlObject>(
             ConfigKey(m_group, "memorycue_count"));
     m_pMemoryCueCount->setReadOnly();
@@ -2076,8 +2078,9 @@ void CueControl::memoryCueSet(double value) {
 
     // Refuse to stack a second memory cue on (almost) the same position.
     // CDJs snap repeated MEMORY presses at the same spot to a single cue.
+    const mixxx::audio::SampleRate sampleRate = frameInfo().sampleRate;
     const mixxx::audio::FrameDiff_t toleranceFrames =
-            frameInfo().sampleRate.isValid() ? frameInfo().sampleRate * 0.05 : 0;
+            sampleRate.isValid() ? sampleRate * 0.05 : 0;
     const QList<CuePointer> cues = pLoadedTrack->getCuePoints();
     for (const auto& pCue : cues) {
         if (pCue->getType() != mixxx::CueType::MemoryCue) {
@@ -2116,8 +2119,9 @@ void CueControl::memoryCueDelete(double value) {
     // Delete the memory cue closest to the playhead, but only if it is within
     // grabbing distance -- deleting a cue that is nowhere near what the user
     // is looking at would be data loss, not cleanup.
+    const mixxx::audio::SampleRate sampleRate = frameInfo().sampleRate;
     const mixxx::audio::FrameDiff_t toleranceFrames =
-            frameInfo().sampleRate.isValid() ? frameInfo().sampleRate * 0.5 : 0;
+            sampleRate.isValid() ? sampleRate * 0.5 : 0;
     CuePointer pNearestCue;
     mixxx::audio::FrameDiff_t nearestDistance = 0;
     const QList<CuePointer> cues = pLoadedTrack->getCuePoints();

@@ -1076,6 +1076,15 @@ void readAnalyze(TrackPointer track,
         }
     }
 
+    if (!ignoreCues) {
+        // Loading a track to a deck re-runs this import on the cached Track
+        // object. Hotcues dedup through their slot number in setHotCue() and
+        // MainCue through findCueByType(), but memory cues have no slot, so
+        // clear the previous import before re-adding. The USB device is the
+        // source of truth here, same as for hotcues.
+        track->removeCuesOfType(mixxx::CueType::MemoryCue);
+    }
+
     if (memoryCuesAndLoops.size() > 0) {
         std::sort(memoryCuesAndLoops.begin(),
                 memoryCuesAndLoops.end(),
