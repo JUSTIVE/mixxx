@@ -870,6 +870,27 @@ void setHotCue(TrackPointer track,
     }
 }
 
+/// Add a Rekordbox memory cue as a first-class CueType::MemoryCue.
+///
+/// Memory cues have no hotcue slot: they are ordered by position and navigated
+/// sequentially (CUE/LOOP CALL on CDJ-style controllers). Previously these were
+/// appended to the hotcue range, which made them indistinguishable from real
+/// Rekordbox hotcues once imported and therefore impossible to write back.
+void addMemoryCue(TrackPointer track,
+        mixxx::audio::FramePos position,
+        const QString& label,
+        mixxx::RgbColor::optional_t color) {
+    CuePointer pCue = track->createAndAddCue(
+            mixxx::CueType::MemoryCue,
+            Cue::kNoHotCue,
+            position,
+            mixxx::audio::kInvalidFramePos);
+    pCue->setLabel(label);
+    if (color) {
+        pCue->setColor(*color);
+    }
+}
+
 void readAnalyze(TrackPointer track,
         mixxx::audio::SampleRate sampleRate,
         int timingOffset,
@@ -1069,16 +1090,9 @@ void readAnalyze(TrackPointer track,
                 memoryCueOrLoopIndex++) {
             memory_cue_loop_t memoryCueOrLoop = memoryCuesAndLoops[memoryCueOrLoopIndex];
 
-            if (!mainCueFound && !memoryCueOrLoop.endPosition.isValid()) {
-                // Set first chronological memory cue as Mixxx MainCue
-                track->setMainCuePosition(memoryCueOrLoop.startPosition);
-                CuePointer pMainCue = track->findCueByType(mixxx::CueType::MainCue);
-                pMainCue->setLabel(memoryCueOrLoop.comment);
-                pMainCue->setColor(*memoryCueOrLoop.color);
-                mainCueFound = true;
-            } else {
-                // Mixxx v2.4 will feature multiple loops, so these saved here will be usable
-                // For 2.3, Mixxx treats them as hotcues and the first one will be loaded as the single loop Mixxx supports
+            if (memoryCueOrLoop.endPosition.isValid()) {
+                // Saved loop. Still stored in the hotcue range, because Mixxx
+                // addresses loops by hotcue index.
                 lastHotCueIndex++;
                 setHotCue(
                         track,
@@ -1087,6 +1101,27 @@ void readAnalyze(TrackPointer track,
                         lastHotCueIndex,
                         memoryCueOrLoop.comment,
                         memoryCueOrLoop.color);
+                continue;
+            }
+
+            // Memory cue. Import as a first-class CueType::MemoryCue so that it
+            // stays distinguishable from Rekordbox hotcues and can be navigated
+            // and written back.
+            addMemoryCue(track,
+                    memoryCueOrLoop.startPosition,
+                    memoryCueOrLoop.comment,
+                    memoryCueOrLoop.color);
+
+            if (!mainCueFound) {
+                // The first chronological memory cue is where a CDJ parks the
+                // playhead on load, so mirror it onto Mixxx's MainCue as well.
+                // It intentionally exists twice: once as MainCue (the CUE
+                // button) and once as MemoryCue (the navigation list).
+                track->setMainCuePosition(memoryCueOrLoop.startPosition);
+                CuePointer pMainCue = track->findCueByType(mixxx::CueType::MainCue);
+                pMainCue->setLabel(memoryCueOrLoop.comment);
+                pMainCue->setColor(*memoryCueOrLoop.color);
+                mainCueFound = true;
             }
         }
     }

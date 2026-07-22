@@ -19,6 +19,14 @@ enum class CueType {
     Outro = 7,
     N60dBSound = 8, // range that covers beginning and end of audible
                     // sound; not shown to user
+    /// A named position that is not bound to a hotcue slot. Equivalent to
+    /// Rekordbox/CDJ "memory cues": there can be arbitrarily many per track,
+    /// they are navigated sequentially rather than triggered by a pad, and
+    /// they survive a round trip to Rekordbox.
+    ///
+    /// Unlike CueType::HotCue these have no hotcue index; ordering is by
+    /// position only.
+    MemoryCue = 9,
 };
 
 enum class CueFlag {
