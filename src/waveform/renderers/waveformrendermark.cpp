@@ -43,7 +43,7 @@ void WaveformRenderMark::drawMemoryCues(QPainter* painter) {
 
         QColor color = mark.color;
         color.setAlphaF(0.9f);
-        painter->setPen(QPen(color, 1.5));
+        painter->setPen(QPen(color, 2.5));
 
         if (m_waveformRenderer->getOrientation() == Qt::Horizontal) {
             if (markPoint < 0 || markPoint > m_waveformRenderer->getWidth()) {

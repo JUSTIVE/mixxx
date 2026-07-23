@@ -456,9 +456,11 @@ void WOverview::updateCues(const QList<CuePointer> &loadedCues) {
         if (currentCue->getType() == mixxx::CueType::MemoryCue) {
             const mixxx::audio::FramePos position = currentCue->getPosition();
             if (position.isValid()) {
+                // Fixed magenta -- see the note in
+                // WaveformRenderMarkBase::updateMarksFromCues.
                 m_memoryCueMarks.push_back(MemoryCueMark{
                         position.toEngineSamplePos(),
-                        mixxx::RgbColor::toQColor(currentCue->getColor())});
+                        QColor(255, 0, 255)});
             }
             continue;
         }
@@ -916,7 +918,7 @@ void WOverview::drawMemoryCues(QPainter* pPainter, const float offset, const flo
         const QColor color = mark.color;
 
         PainterScope painterScope(pPainter);
-        pPainter->setPen(QPen(color, 1.0 * m_scaleFactor));
+        pPainter->setPen(QPen(color, 2.0 * m_scaleFactor));
         if (m_orientation == Qt::Horizontal) {
             pPainter->drawLine(QLineF(markPosition, 0.0, markPosition, height()));
         } else {

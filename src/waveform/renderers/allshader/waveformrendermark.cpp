@@ -158,7 +158,7 @@ void allshader::WaveformRenderMark::drawMemoryCues(const QMatrix4x4& matrix) {
     const float devicePixelRatio = m_waveformRenderer->getDevicePixelRatio();
     const float breadth = m_waveformRenderer->getBreadth();
     const float length = static_cast<float>(m_waveformRenderer->getLength());
-    const float halfWidth = 0.75f;
+    const float halfWidth = 1.5f;
 
     VertexData vertices;
     RGBAData rgbaData;
@@ -182,7 +182,7 @@ void allshader::WaveformRenderMark::drawMemoryCues(const QMatrix4x4& matrix) {
         // the matching 6 colors, so both are called exactly once per mark.
         vertices.addRectangle(x - halfWidth, 0.f, x + halfWidth, breadth);
         // Slightly translucent so overlapping hotcue lines still read.
-        rgbaData.addForRectangle(r, g, b, 0.9f);
+        rgbaData.addForRectangle(r, g, b, 1.0f);
     }
 
     if (vertices.size() == 0) {
