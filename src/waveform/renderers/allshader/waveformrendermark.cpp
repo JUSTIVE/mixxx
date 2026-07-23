@@ -160,8 +160,11 @@ void allshader::WaveformRenderMark::drawMemoryCues(const QMatrix4x4& matrix) {
     const float length = static_cast<float>(m_waveformRenderer->getLength());
     const float halfWidth = 1.5f;
     // Downward-pointing triangle flag at the top of each bar (CDJ style).
-    const float triHalfBase = 5.f;
-    const float triHeight = 9.f;
+    // Size it as a fraction of the waveform height so it is clearly visible
+    // regardless of whether the coordinate space is logical or device pixels
+    // (a fixed pixel count came out tiny on the HiDPI panel).
+    const float triHeight = breadth * 0.14f;
+    const float triHalfBase = breadth * 0.07f;
 
     VertexData vertices;
     RGBAData rgbaData;
