@@ -159,11 +159,15 @@ void allshader::WaveformRenderMark::drawMemoryCues(const QMatrix4x4& matrix) {
     const float breadth = m_waveformRenderer->getBreadth();
     const float length = static_cast<float>(m_waveformRenderer->getLength());
     const float halfWidth = 1.5f;
+    // Downward-pointing triangle flag at the top of each bar (CDJ style).
+    const float triHalfBase = 5.f;
+    const float triHeight = 9.f;
 
     VertexData vertices;
     RGBAData rgbaData;
-    vertices.reserve(static_cast<int>(marks.size()) * 6);
-    rgbaData.reserve(static_cast<int>(marks.size()) * 6);
+    // 6 vertices for the bar + 3 for the triangle flag, per mark.
+    vertices.reserve(static_cast<int>(marks.size()) * 9);
+    rgbaData.reserve(static_cast<int>(marks.size()) * 9);
 
     for (const MemoryCueMark& mark : marks) {
         const float x = std::round(
@@ -181,8 +185,11 @@ void allshader::WaveformRenderMark::drawMemoryCues(const QMatrix4x4& matrix) {
         // One addRectangle = 6 vertices (2 triangles); addForRectangle emits
         // the matching 6 colors, so both are called exactly once per mark.
         vertices.addRectangle(x - halfWidth, 0.f, x + halfWidth, breadth);
-        // Slightly translucent so overlapping hotcue lines still read.
         rgbaData.addForRectangle(r, g, b, 1.0f);
+        // Flag pointing down from the top edge, apex on the bar.
+        vertices.addTriangle(
+                {x - triHalfBase, 0.f}, {x + triHalfBase, 0.f}, {x, triHeight});
+        rgbaData.addForTriangle(r, g, b, 1.0f);
     }
 
     if (vertices.size() == 0) {

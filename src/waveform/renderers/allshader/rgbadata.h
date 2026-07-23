@@ -19,6 +19,12 @@ class allshader::RGBAData {
         mData.push_back({r, g, b, a});
         mData.push_back({r, g, b, a});
     }
+    // Matches VertexData::addTriangle (3 vertices).
+    void addForTriangle(float r, float g, float b, float a) {
+        mData.push_back({r, g, b, a});
+        mData.push_back({r, g, b, a});
+        mData.push_back({r, g, b, a});
+    }
     void addForRectangleGradient(float rA,
             float gA,
             float bA,
