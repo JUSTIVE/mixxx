@@ -816,10 +816,24 @@ PioneerDDJFLX4.backButton = function(_channel, _control, value, _status, _group)
     if (!value) {
         return;
     }
+    // [Tab],current: 0 = Overview, 1 = Browse, 2 = Sampler (Pioneered skin).
     if (engine.getValue("[Tab]", "current") === 0) {
+        // Overview -> Browse.
         engine.setValue("[Tab]", "library", 1);
+        return;
+    }
+    // In Browse, toggle between the playlist panel (sidebar) and the song
+    // panel (track table). [Library],focused_widget: 2 = Sidebar, 3 = TracksTable.
+    var FOCUS_SIDEBAR = 2;
+    var FOCUS_TRACKS = 3;
+    if (engine.getValue("[Library]", "focused_widget") === FOCUS_TRACKS) {
+        // Song panel -> back to the playlist panel.
+        engine.setValue("[Library]", "focused_widget", FOCUS_SIDEBAR);
     } else {
-        engine.setValue("[Tab]", "overview", 1);
+        // Playlist panel (or anything else) -> show the selected playlist's
+        // songs. GoToItem moves focus to the track table for a selected leaf
+        // node (a playlist), or expands a folder.
+        script.triggerControl("[Library]", "GoToItem", 50);
     }
 };
 
