@@ -142,37 +142,67 @@ void allshader::WaveformRenderMark::drawTexture(
 }
 
 void allshader::WaveformRenderMark::drawMemoryCues(const QMatrix4x4& matrix) {
-    // Memory cues (CueType::MemoryCue) are not part of the skin-defined
-    // WaveformMarkSet, which assumes one mark per fixed control name.
-    // Draw them directly from the track's cue list as thin vertical
-    // lines in the cue's color, matching how CDJs show memory cues on
-    // the scrolling waveform.
-    const TrackPointer pTrack = m_waveformRenderer->getTrackInfo();
-    if (!pTrack) {
+    // Memory cues come from the base class cache (memoryCueMarks()), which is
+    // refreshed only on cue changes -- not per frame. Draw each as a solid
+    // vertical bar in the cue's color.
+    //
+    // Note: drawMark() cannot be reused here. It renders only the top and
+    // bottom quarters as gradients fading to transparent (the translucent
+    // edges of a loop region), leaving the middle empty -- a thin bar drawn
+    // that way is invisible. A solid rectangle via addForRectangle is needed.
+    const auto& marks = memoryCueMarks();
+    if (marks.empty()) {
         return;
     }
 
+    const float devicePixelRatio = m_waveformRenderer->getDevicePixelRatio();
     const float breadth = m_waveformRenderer->getBreadth();
     const float length = static_cast<float>(m_waveformRenderer->getLength());
-    const QList<CuePointer> cues = pTrack->getCuePoints();
-    for (const CuePointer& pCue : cues) {
-        if (pCue->getType() != mixxx::CueType::MemoryCue) {
-            continue;
-        }
-        const mixxx::audio::FramePos position = pCue->getPosition();
-        if (!position.isValid()) {
-            continue;
-        }
-        const float x = static_cast<float>(
-                m_waveformRenderer->transformSamplePositionInRendererWorld(
-                        position.toEngineSamplePos()));
+    const float halfWidth = 0.75f;
+
+    VertexData vertices;
+    RGBAData rgbaData;
+    vertices.reserve(static_cast<int>(marks.size()) * 6);
+    rgbaData.reserve(static_cast<int>(marks.size()) * 6);
+
+    for (const MemoryCueMark& mark : marks) {
+        const float x = std::round(
+                                static_cast<float>(
+                                        m_waveformRenderer
+                                                ->transformSamplePositionInRendererWorld(
+                                                        mark.samplePosition)) *
+                                devicePixelRatio) /
+                devicePixelRatio;
         if (x < 0.f || x > length) {
             continue;
         }
-        QColor color = mixxx::RgbColor::toQColor(pCue->getColor());
-        color.setAlphaF(0.9f);
-        drawMark(matrix, QRectF(x - 0.75, 0.0, 1.5, breadth), color);
+        float r, g, b, a;
+        getRgbF(mark.color, &r, &g, &b, &a);
+        // One addRectangle = 6 vertices (2 triangles); addForRectangle emits
+        // the matching 6 colors, so both are called exactly once per mark.
+        vertices.addRectangle(x - halfWidth, 0.f, x + halfWidth, breadth);
+        // Slightly translucent so overlapping hotcue lines still read.
+        rgbaData.addForRectangle(r, g, b, 0.9f);
     }
+
+    if (vertices.size() == 0) {
+        return;
+    }
+
+    m_rgbaShader.bind();
+    m_rgbaShader.setUniformValue(m_rgbaShader.matrixLocation(), matrix);
+    const int positionLocation = m_rgbaShader.positionLocation();
+    const int colorLocation = m_rgbaShader.colorLocation();
+    m_rgbaShader.enableAttributeArray(positionLocation);
+    m_rgbaShader.setAttributeArray(
+            positionLocation, GL_FLOAT, vertices.constData(), 2);
+    m_rgbaShader.enableAttributeArray(colorLocation);
+    m_rgbaShader.setAttributeArray(
+            colorLocation, GL_FLOAT, rgbaData.constData(), 4);
+    glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+    m_rgbaShader.disableAttributeArray(positionLocation);
+    m_rgbaShader.disableAttributeArray(colorLocation);
+    m_rgbaShader.release();
 }
 
 void allshader::WaveformRenderMark::drawMark(

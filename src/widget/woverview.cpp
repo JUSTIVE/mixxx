@@ -448,7 +448,21 @@ void WOverview::slotNormalizeOrVisualGainChanged() {
 }
 
 void WOverview::updateCues(const QList<CuePointer> &loadedCues) {
+    // Rebuild the memory cue cache here (called on cue changes) so the paint
+    // path never has to lock and copy the track's cue list per frame.
+    m_memoryCueMarks.clear();
+
     for (const CuePointer& currentCue : loadedCues) {
+        if (currentCue->getType() == mixxx::CueType::MemoryCue) {
+            const mixxx::audio::FramePos position = currentCue->getPosition();
+            if (position.isValid()) {
+                m_memoryCueMarks.push_back(MemoryCueMark{
+                        position.toEngineSamplePos(),
+                        mixxx::RgbColor::toQColor(currentCue->getColor())});
+            }
+            continue;
+        }
+
         const WaveformMarkPointer pMark = m_marks.getHotCueMark(currentCue->getHotCue());
 
         if (pMark != nullptr && pMark->isValid() && pMark->isVisible()
@@ -883,32 +897,23 @@ void WOverview::drawRangeMarks(QPainter* pPainter, const float& offset, const fl
 void WOverview::drawMemoryCues(QPainter* pPainter, const float offset, const float gain) {
     // Memory cues are not part of the skin-defined WaveformMarkSet (which
     // assumes a fixed set of controls, one per hotcue slot), so they are
-    // painted directly from the track's cue list: a thin line with a small
-    // CDJ-style triangle at the top edge. Repaints arrive via the existing
-    // Track::cuesUpdated -> receiveCuesUpdated connection.
-    if (!m_pCurrentTrack) {
+    // painted directly from m_memoryCueMarks -- cached in updateCues() on cue
+    // changes, not read per frame -- as a thin line with a small CDJ-style
+    // triangle at the top edge.
+    if (m_memoryCueMarks.empty()) {
         return;
     }
 
     const float triangleWidth = 8.0f * m_scaleFactor;
     const float triangleHeight = 6.0f * m_scaleFactor;
 
-    const QList<CuePointer> cues = m_pCurrentTrack->getCuePoints();
-    for (const CuePointer& pCue : cues) {
-        if (pCue->getType() != mixxx::CueType::MemoryCue) {
-            continue;
-        }
-        const mixxx::audio::FramePos position = pCue->getPosition();
-        if (!position.isValid()) {
-            continue;
-        }
-
+    for (const MemoryCueMark& mark : m_memoryCueMarks) {
         const float markPosition = math_clamp(
-                offset + static_cast<float>(position.toEngineSamplePos()) * gain,
+                offset + static_cast<float>(mark.samplePosition) * gain,
                 0.0f,
                 static_cast<float>(width()));
 
-        const QColor color = mixxx::RgbColor::toQColor(pCue->getColor());
+        const QColor color = mark.color;
 
         PainterScope painterScope(pPainter);
         pPainter->setPen(QPen(color, 1.0 * m_scaleFactor));

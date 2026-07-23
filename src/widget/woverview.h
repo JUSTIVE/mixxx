@@ -225,4 +225,13 @@ class WOverview : public WWidget, public TrackDropTarget {
     std::vector<WaveformMarkRange> m_markRanges;
     WaveformMarkLabel m_cuePositionLabel;
     WaveformMarkLabel m_cueTimeDistanceLabel;
+
+    // Memory cues (CueType::MemoryCue) have no fixed control and are dynamic
+    // in count, so they live outside m_marks. Cached here from updateCues()
+    // (called on cue changes) and painted directly -- never read per frame.
+    struct MemoryCueMark {
+        double samplePosition;
+        QColor color;
+    };
+    std::vector<MemoryCueMark> m_memoryCueMarks;
 };

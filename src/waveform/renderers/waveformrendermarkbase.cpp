@@ -51,6 +51,10 @@ void WaveformRenderMarkBase::slotCuesUpdated() {
 }
 
 void WaveformRenderMarkBase::updateMarksFromCues() {
+    // Rebuilt from scratch on every cue change and on track set. Cleared
+    // before the early return so an unloaded track leaves no stale marks.
+    m_memoryCueMarks.clear();
+
     const TrackPointer pTrackInfo = m_waveformRenderer->getTrackInfo();
     if (!pTrackInfo) {
         return;
@@ -59,6 +63,17 @@ void WaveformRenderMarkBase::updateMarksFromCues() {
     const int dimBrightThreshold = m_waveformRenderer->getDimBrightThreshold();
     const QList<CuePointer> loadedCues = pTrackInfo->getCuePoints();
     for (const CuePointer& pCue : loadedCues) {
+        if (pCue->getType() == mixxx::CueType::MemoryCue) {
+            const mixxx::audio::FramePos position = pCue->getPosition();
+            if (position.isValid()) {
+                m_memoryCueMarks.push_back(MemoryCueMark{
+                        position.toEngineSamplePos(),
+                        mixxx::RgbColor::toQColor(pCue->getColor())});
+            }
+            // Memory cues have no hotcue slot; nothing further to do.
+            continue;
+        }
+
         const int hotCue = pCue->getHotCue();
         if (hotCue == Cue::kNoHotCue) {
             continue;

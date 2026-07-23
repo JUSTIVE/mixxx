@@ -26,31 +26,22 @@ WaveformRenderMark::WaveformRenderMark(
 }
 
 void WaveformRenderMark::drawMemoryCues(QPainter* painter) {
-    // Memory cues (CueType::MemoryCue) are not part of the skin-defined
-    // WaveformMarkSet, which assumes one mark per fixed control name.
-    // Draw them directly from the track's cue list as thin lines in the
+    // Memory cues come from the base class cache (memoryCueMarks()), refreshed
+    // only on cue changes, not per frame. Draw each as a thin line in the
     // cue's color, matching how CDJs show memory cues on the scrolling
     // waveform.
-    const TrackPointer pTrack = m_waveformRenderer->getTrackInfo();
-    if (!pTrack) {
+    const auto& marks = memoryCueMarks();
+    if (marks.empty()) {
         return;
     }
 
     PainterScope painterScope(painter);
-    const QList<CuePointer> cues = pTrack->getCuePoints();
-    for (const CuePointer& pCue : cues) {
-        if (pCue->getType() != mixxx::CueType::MemoryCue) {
-            continue;
-        }
-        const mixxx::audio::FramePos position = pCue->getPosition();
-        if (!position.isValid()) {
-            continue;
-        }
+    for (const MemoryCueMark& mark : marks) {
         const double markPoint =
                 m_waveformRenderer->transformSamplePositionInRendererWorld(
-                        position.toEngineSamplePos());
+                        mark.samplePosition);
 
-        QColor color = mixxx::RgbColor::toQColor(pCue->getColor());
+        QColor color = mark.color;
         color.setAlphaF(0.9f);
         painter->setPen(QPen(color, 1.5));
 

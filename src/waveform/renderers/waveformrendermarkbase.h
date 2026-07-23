@@ -1,6 +1,9 @@
 #pragma once
 
+#include <QColor>
 #include <QObject>
+
+#include <vector>
 
 #include "skin/legacy/skincontext.h"
 #include "util/class.h"
@@ -36,10 +39,25 @@ class WaveformRenderMarkBase : public QObject, public WaveformRendererAbstract {
   protected:
     WaveformMarkSet m_marks;
 
+    // Memory cues (CueType::MemoryCue) are not part of the skin-defined
+    // WaveformMarkSet, which instantiates one mark per fixed control name.
+    // They are dynamic in count and have no per-cue control, so they are
+    // cached here from the track's cue list and painted directly by the
+    // concrete renderers. The cache is rebuilt only on cue changes (see
+    // updateMarksFromCues), never per frame.
+    struct MemoryCueMark {
+        double samplePosition;
+        QColor color;
+    };
+    const std::vector<MemoryCueMark>& memoryCueMarks() const {
+        return m_memoryCueMarks;
+    }
+
     void updateMarkImages();
 
   private:
     const bool m_updateImagesImmediately;
+    std::vector<MemoryCueMark> m_memoryCueMarks;
 
     void updateMarksFromCues();
     void updateMarks();
