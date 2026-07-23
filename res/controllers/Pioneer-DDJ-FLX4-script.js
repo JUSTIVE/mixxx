@@ -286,6 +286,21 @@ PioneerDDJFLX4.waveformZoom = function(midichan, control, value, status, group) 
     }
 };
 
+// BROWSE encoder, context-aware for the Pioneered skin. In the Overview view
+// ([Tab],current === 0) it zooms both decks' waveforms on the X axis; in any
+// other view it scrolls the library as before. The encoder is relative:
+// 0x01..0x3f = one direction, 0x41..0x7f = the other (0x7f being a single step
+// back), so map values >= 0x40 to a negative delta.
+PioneerDDJFLX4.browseKnob = function(_midichan, _control, value, _status, _group) {
+    if (engine.getValue("[Tab]", "current") === 0) {
+        var zoomKey = (value < 0x40) ? "waveform_zoom_up" : "waveform_zoom_down";
+        script.triggerControl("[Channel1]", zoomKey, 100);
+        script.triggerControl("[Channel2]", zoomKey, 100);
+    } else {
+        engine.setValue("[Library]", "MoveVertical", (value < 0x40) ? value : value - 128);
+    }
+};
+
 //
 // Channel level lights
 //
