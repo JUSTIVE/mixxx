@@ -790,6 +790,24 @@ PioneerDDJFLX4.memoryCueDelete = function(_channel, _control, value, _status, gr
     engine.setValue(group, "memorycue_delete", value ? 1 : 0);
 };
 
+// BACK button: toggle between the Overview and Browse views of the Pioneered
+// skin. That skin puts Overview / Browse / Sampler in a WidgetStack whose
+// current page index is [Tab],current (0 = Overview, 1 = Browse, 2 = Sampler);
+// setting [Tab],overview or [Tab],library switches to that page. From Overview
+// we go to Browse, from anywhere else back to Overview. This replaces the
+// button's previous MoveFocusForward; SHIFT+BACK still moves library focus.
+// (No-op on skins without a [Tab] stack -- the controls simply don't exist.)
+PioneerDDJFLX4.backButton = function(_channel, _control, value, _status, _group) {
+    if (!value) {
+        return;
+    }
+    if (engine.getValue("[Tab]", "current") === 0) {
+        engine.setValue("[Tab]", "library", 1);
+    } else {
+        engine.setValue("[Tab]", "overview", 1);
+    }
+};
+
 //
 // Shutdown
 //

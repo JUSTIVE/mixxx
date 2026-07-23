@@ -1,6 +1,8 @@
 #include "controllers/midi/midicontroller.h"
 
 #include <QJSValue>
+#include <QRegularExpression>
+
 #include <algorithm>
 
 #include "control/controlobject.h"
@@ -81,9 +83,26 @@ int MidiController::close() {
 }
 
 bool MidiController::matchMapping(const MappingInfo& mapping) {
-    // Product info mapping not implemented for MIDI devices yet
-    Q_UNUSED(mapping);
-    return false;
+    // MIDI devices carry no USB product/vendor info here, so match by name.
+    // Linux (ALSA/PortMIDI) enumerates devices as "<name> MIDI <n>"; strip
+    // that suffix to get the bare device name (e.g. "DDJ-FLX4"), then compare
+    // case-insensitively against the mapping's declared name (from
+    // <info><name>, e.g. "Pioneer DDJ-FLX4"). Either containing the other
+    // counts as a match, so "DDJ-FLX4" pairs with "Pioneer DDJ-FLX4" while
+    // still staying specific enough not to grab, say, a DDJ-400 mapping.
+    static const QRegularExpression midiSuffix(QStringLiteral(" MIDI \\d+.*$"));
+    QString device = getName();
+    device.remove(midiSuffix);
+    device = device.trimmed();
+    if (device.isEmpty()) {
+        return false;
+    }
+    const QString mappingName = mapping.getName();
+    if (mappingName.isEmpty()) {
+        return false;
+    }
+    return mappingName.contains(device, Qt::CaseInsensitive) ||
+            device.contains(mappingName, Qt::CaseInsensitive);
 }
 
 bool MidiController::applyMapping() {

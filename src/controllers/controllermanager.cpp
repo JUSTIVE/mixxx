@@ -257,13 +257,50 @@ void ControllerManager::slotSetUpDevices() {
         // The filename for this device name.
         QString deviceName = sanitizeDeviceName(name);
 
-        // Check if device is enabled
-        if (!m_pConfig->getValue(ConfigKey("[Controller]", deviceName), 0)) {
+        bool enabled = m_pConfig->getValue(ConfigKey("[Controller]", deviceName), 0);
+
+        // Check if device has a configured mapping (one the user previously
+        // picked, saved under [ControllerPreset]).
+        QString mappingFilePath = getConfiguredMappingFileForDevice(deviceName);
+
+        if (mappingFilePath.isEmpty()) {
+            // Nothing saved. Auto-match a built-in mapping whose name matches
+            // this controller so a known device works the moment it is plugged
+            // in -- no picking a mapping every session, and no reliance on
+            // config that a hard power-off might not have written back. On a
+            // unique match we also enable the device (this is a dedicated DJ
+            // appliance; controllers are plugged in to be used).
+            const QList<MappingInfo> systemMappings =
+                    m_pMainThreadSystemMappingEnumerator->getMappingsByExtension(
+                            pController->mappingExtension());
+            QString matchedPath;
+            QString matchedName;
+            int matchCount = 0;
+            for (const MappingInfo& candidate : systemMappings) {
+                if (pController->matchMapping(candidate)) {
+                    matchedPath = candidate.getPath();
+                    matchedName = candidate.getName();
+                    matchCount++;
+                }
+            }
+            if (matchCount == 1) {
+                mappingFilePath = matchedPath;
+                enabled = true;
+                qInfo() << "Auto-matched mapping" << matchedName
+                        << "for controller" << name;
+            } else if (matchCount > 1) {
+                qInfo() << "Not auto-loading a mapping for" << name
+                        << "-- " << matchCount << "built-in mappings match "
+                        << "its name; leaving the choice to the user.";
+            }
+        }
+
+        // Check if device is enabled (either by the user or by the auto-match
+        // above).
+        if (!enabled) {
             continue;
         }
 
-        // Check if device has a configured mapping
-        QString mappingFilePath = getConfiguredMappingFileForDevice(deviceName);
         if (mappingFilePath.isEmpty()) {
             continue;
         }
