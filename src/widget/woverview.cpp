@@ -456,11 +456,11 @@ void WOverview::updateCues(const QList<CuePointer> &loadedCues) {
         if (currentCue->getType() == mixxx::CueType::MemoryCue) {
             const mixxx::audio::FramePos position = currentCue->getPosition();
             if (position.isValid()) {
-                // Fixed magenta -- see the note in
+                // Fixed red -- see the note in
                 // WaveformRenderMarkBase::updateMarksFromCues.
                 m_memoryCueMarks.push_back(MemoryCueMark{
                         position.toEngineSamplePos(),
-                        QColor(255, 0, 255)});
+                        QColor(255, 0, 0)});
             }
             continue;
         }

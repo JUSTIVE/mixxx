@@ -66,12 +66,12 @@ void WaveformRenderMarkBase::updateMarksFromCues() {
         if (pCue->getType() == mixxx::CueType::MemoryCue) {
             const mixxx::audio::FramePos position = pCue->getPosition();
             if (position.isValid()) {
-                // Paint memory cues in a fixed magenta rather than the cue's
+                // Paint memory cues in a fixed red rather than the cue's
                 // own color: the stored/default color was too easily lost
-                // against the waveform. Magenta reads clearly on any waveform.
+                // against the waveform. Red reads clearly on any waveform.
                 m_memoryCueMarks.push_back(MemoryCueMark{
                         position.toEngineSamplePos(),
-                        QColor(255, 0, 255)});
+                        QColor(255, 0, 0)});
             }
             // Memory cues have no hotcue slot; nothing further to do.
             continue;
