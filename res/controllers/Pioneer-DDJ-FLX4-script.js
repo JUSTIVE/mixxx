@@ -823,17 +823,23 @@ PioneerDDJFLX4.backButton = function(_channel, _control, value, _status, _group)
         return;
     }
     // In Browse, toggle between the playlist panel (sidebar) and the song
-    // panel (track table). [Library],focused_widget: 2 = Sidebar, 3 = TracksTable.
+    // panel (track table). In the Pioneered skin the two panels are mutually
+    // exclusive, driven by [Sidebar],sidebar_visible: 1 shows the tree (and
+    // hides the track table), 0 shows the track table full-width (and hides
+    // the tree). So the toggle drives that visibility control -- not just the
+    // keyboard focus -- and moves focus along with it.
+    // ([Library],focused_widget: 2 = Sidebar, 3 = TracksTable.)
     var FOCUS_SIDEBAR = 2;
-    var FOCUS_TRACKS = 3;
-    if (engine.getValue("[Library]", "focused_widget") === FOCUS_TRACKS) {
-        // Song panel -> back to the playlist panel.
-        engine.setValue("[Library]", "focused_widget", FOCUS_SIDEBAR);
-    } else {
-        // Playlist panel (or anything else) -> show the selected playlist's
-        // songs. GoToItem moves focus to the track table for a selected leaf
-        // node (a playlist), or expands a folder.
+    if (engine.getValue("[Sidebar]", "sidebar_visible")) {
+        // Tree visible -> go to songs: load the selected playlist into the
+        // track table (GoToItem also moves focus there), then hide the tree so
+        // the songs take the full width.
         script.triggerControl("[Library]", "GoToItem", 50);
+        engine.setValue("[Sidebar]", "sidebar_visible", 0);
+    } else {
+        // Songs shown -> back to the tree: reveal it and focus it.
+        engine.setValue("[Sidebar]", "sidebar_visible", 1);
+        engine.setValue("[Library]", "focused_widget", FOCUS_SIDEBAR);
     }
 };
 
